@@ -1,2 +1,2 @@
 This is a simple secret status sharing web app built with html, css, javascript, nodejs, expressjs and mongooseDB.
-Different levels of basic authentication and security features will applied to this projects to protect the passwords of users from hacking.
+Different levels of basic authentication and security features will be applied to this projects to protect the passwords of users from hacking.
