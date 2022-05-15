@@ -5,8 +5,11 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-// const encrypt = require("mongoose-encryption");  //belongs to Level 2 Authentication: database encryption
-const md5 = require("md5");
+// const encrypt = require("mongoose-encryption");  //belongs to the Level 2 Authentication: database encryption
+// const md5 = require("md5");  //belongs to the Level 3 Authentication: enable hashing the passwords
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
+
 
 const app = express();
 
@@ -28,7 +31,6 @@ const userSchema = new mongoose.Schema({
 // const secret = "Thisisourlittlesecrets!";
 //using the environment variables from a .env file with dotenv package to protect our private information
 // userSchema.plugin(encrypt, { secret: process.env.SECRET, encryptedFields: ["password"] });
-//belongs to Level 2 Authentication: database encryption
 
 const User = new mongoose.model("User", userSchema);
 
@@ -46,32 +48,52 @@ app.get("/register", (req, res) => {
 });
 
 app.post("/register", (req, res) => {
-  const newUser = new User({
-    email: req.body.username,
-    //Level 3 Authentication: enable hashing the password with md5 package
-    password: md5(req.body.password)
+  //Level 4 Authentication: salting and hashing the passwords with bcrypt package
+  bcrypt.hash(req.body.password, saltRounds, (err, hash) => {
+    // Store hash in your password DB.
+    const newUser = new User({
+      email: req.body.username,
+      //Level 3 Authentication: enable hashing the password with md5 package
+      // password: md5(req.body.password)
+      password: hash
+    });
+    newUser.save((err) => {
+      if (!err) {
+        res.render("secrets");
+        console.log("New User Registration Succesful!");
+      } else {
+        console.log(err);
+      }
+    });
   });
-  newUser.save((err) => {
-    if (!err) {
-      res.render("secrets");
-    } else {
-      console.log(err);
-    }
-  });
+
+
 });
 
 app.post("/login", (req, res) => {
   const username = req.body.username;
   //Level 3 Authentication: enable hashing the password with md5 package
-  const password = md5(req.body.password);
+  // const password = md5(req.body.password);
+  const password = req.body.password;
   User.findOne({
     email: username
   }, (err, foundUser) => {
     if (!err) {
       if (foundUser) {
-        if (foundUser.password === password) {
-          res.render("secrets");
-        }
+        //Level 4 Authentication: salting and hashing the passwords with bcrypt package
+        bcrypt.compare(password, foundUser.password, (err, result) => {
+          if (!err) {
+            if (result == true) {
+              res.render("secrets");
+              console.log("Log in Succesful!");
+            }
+          } else {
+            console.log(err);
+          }
+        });
+        // if (foundUser.password === password) {
+        //   res.render("secrets");
+        // }
       }
     } else {
       console.log(err);
