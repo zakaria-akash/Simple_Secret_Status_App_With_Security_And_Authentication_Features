@@ -7,3 +7,6 @@ node_modules/
 .env.production.local
 .env.local
 .env.test
+# google oauth2.0 info files
+google_oauth2.0_client_info.json
+google_oauth2.0_client_info.json.bak

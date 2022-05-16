@@ -14,6 +14,9 @@ const passport = require("passport");
 const passportLocalMongoose = require("passport-local-mongoose");
 //Level 5 Authentication: using Passport.js for auto salting and hashing with passport, passport-local, passport-local-mongoose and express-session package
 
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const findOrCreate = require('mongoose-findorcreate');
+
 const app = express();
 
 app.use(express.static("public"));
@@ -33,13 +36,14 @@ app.use(passport.session());
 
 mongoose.connect("mongodb://localhost:27017/secretsAppDB");
 
-//changing the simple version of schema into a full version of schema
+//changing the simple JavaScript version of schema into a full version of Mongoose Schema
 const userSchema = new mongoose.Schema({
   email: String,
   password: String
 });
 
 userSchema.plugin(passportLocalMongoose);
+userSchema.plugin(findOrCreate);
 
 //Level 2 Authentication: enable database encryption with mongoose-encryption package
 // const secret = "Thisisourlittlesecrets!";
@@ -52,6 +56,19 @@ passport.use(User.createStrategy());
 
 passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());
+
+passport.use(new GoogleStrategy({
+    clientID: process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET,
+    callbackURL: "http://localhost:3000/auth/google/secrets",
+    userProfileURL: "http://www.googleapis.com/oauth2/v3/userinfo"
+  },
+  function(accessToken, refreshToken, profile, cb) {
+    User.findOrCreate({ googleId: profile.id }, function (err, user) {
+      return cb(err, user);
+    });
+  }
+));
 
 
 app.get("/", (req, res) => {
