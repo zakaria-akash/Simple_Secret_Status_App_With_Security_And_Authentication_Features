@@ -5,18 +5,16 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-// const encrypt = require("mongoose-encryption");  //belongs to the Level 2 Authentication: database encryption
-// const md5 = require("md5");  //belongs to the Level 3 Authentication: enable hashing the passwords
-// const bcrypt = require('bcrypt');
-// const saltRounds = 10;  //Level 4 Authentication: salting and hashing the passwords
+
+//Level 5 Authentication: using Passport.js for auto salting and hashing with passport, passport-local, passport-local-mongoose and express-session package
 const session = require("express-session");
 const passport = require("passport");
 const passportLocalMongoose = require("passport-local-mongoose");
-//Level 5 Authentication: using Passport.js for auto salting and hashing with passport, passport-local, passport-local-mongoose and express-session package
 
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const findOrCreate = require('mongoose-findorcreate');
 //Level 6 Authentication: Implementation of Google OAuth 2.0 social login strategy
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const findOrCreate = require("mongoose-findorcreate");
+
 
 
 const app = express();
@@ -36,22 +34,22 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-mongoose.connect("mongodb://localhost:27017/secretsAppDB");
+// mongoose.connect("mongodb://localhost:27017/secretsAppDB");
+
+//using MongoDB Atlas cloud database instead of localhost
+mongoose.connect("mongodb+srv://" + process.env.ATLAS_USERNAME + ":" + process.env.ATLAS_PASSWORD + "@" + process.env.CLUSTER_VERSION + ".5mukk.mongodb.net/secretsAppDB");
 
 //changing the simple JavaScript version of schema into a full version of Mongoose Schema
 const userSchema = new mongoose.Schema({
   email: String,
   password: String,
-  googleId: String
+  googleId: String,
+  secretStatus: String
 });
 
 userSchema.plugin(passportLocalMongoose);
 userSchema.plugin(findOrCreate);
 
-//Level 2 Authentication: enable database encryption with mongoose-encryption package
-// const secret = "Thisisourlittlesecrets!";
-//using the environment variables from a .env file with dotenv package to protect our private information
-// userSchema.plugin(encrypt, { secret: process.env.SECRET, encryptedFields: ["password"] });
 
 const User = new mongoose.model("User", userSchema);
 
@@ -59,14 +57,14 @@ passport.use(User.createStrategy());
 
 // used to serialize the user for the session
 passport.serializeUser((user, done) => {
-    done(null, user.id);
+  done(null, user.id);
 });
 
 // used to deserialize the user to retrieve the data from the session
 passport.deserializeUser((id, done) => {
-    User.findById(id, (err, user) => {
-        done(err, user);
-    });
+  User.findById(id, (err, user) => {
+    done(err, user);
+  });
 });
 
 passport.use(new GoogleStrategy({
@@ -113,11 +111,47 @@ app.get("/register", (req, res) => {
 });
 
 app.get("/secrets", (req, res) => {
+  User.find({
+    "secrets": {
+      $ne: null
+    }
+  }, (err, foundUser) => {
+    if (err) {
+      console.log(err);
+    } else {
+      if (foundUser) {
+        res.render("secrets", {
+          userWithSecrets: foundUser
+        });
+      }
+    }
+  });
+});
+
+app.get("/submit", (req, res) => {
   if (req.isAuthenticated()) {
-    res.render("secrets");
+    res.render("submit");
   } else {
     res.redirect("/login");
   }
+});
+
+app.post("/submit", (req, res) => {
+  const submittedSecret = req.body.secret;
+  const currentUserID = req.user.id;
+  User.findById(currentUserID, function(err, foundUser) {
+    if (err) {
+      console.log(err);
+    } else {
+      if (foundUser) {
+        foundUser.secretStatus = submittedSecret;
+        foundUser.save(function() {
+          res.redirect("/secrets");
+        });
+      }
+    }
+  });
+
 });
 
 app.get("/logout", (req, res) => {
@@ -126,24 +160,6 @@ app.get("/logout", (req, res) => {
 });
 
 app.post("/register", (req, res) => {
-  // //Level 4 Authentication: salting and hashing the passwords with bcrypt package
-  // bcrypt.hash(req.body.password, saltRounds, (err, hash) => {
-  //   // Store hash in your password DB.
-  //   const newUser = new User({
-  //     email: req.body.username,
-  //     //Level 3 Authentication: enable hashing the password with md5 package
-  //     // password: md5(req.body.password)
-  //     password: hash
-  //   });
-  //   newUser.save((err) => {
-  //     if (!err) {
-  //       res.render("secrets");
-  //       console.log("New User Registration Succesful!");
-  //     } else {
-  //       console.log(err);
-  //     }
-  //   });
-  // });
 
   //this following User.register() method comes from passport-local-mongoose package
   User.register({
@@ -162,34 +178,6 @@ app.post("/register", (req, res) => {
 });
 
 app.post("/login", (req, res) => {
-  // const username = req.body.username;
-  // //Level 3 Authentication: enable hashing the password with md5 package
-  // // const password = md5(req.body.password);
-  // const password = req.body.password;
-  // User.findOne({
-  //   email: username
-  // }, (err, foundUser) => {
-  //   if (!err) {
-  //     if (foundUser) {
-  //       //Level 4 Authentication: salting and hashing the passwords with bcrypt package
-  //       bcrypt.compare(password, foundUser.password, (err, result) => {
-  //         if (!err) {
-  //           if (result == true) {
-  //             res.render("secrets");
-  //             console.log("Log in Succesful!");
-  //           }
-  //         } else {
-  //           console.log(err);
-  //         }
-  //       });
-  //       // if (foundUser.password === password) {
-  //       //   res.render("secrets");
-  //       // }
-  //     }
-  //   } else {
-  //     console.log(err);
-  //   }
-  // });
 
   const newUser = new User({
     username: req.body.username,
